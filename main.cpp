@@ -18,6 +18,12 @@ char* trackbar_value3 = "angle_low Value";
 char* trackbar_value4 = "angle_high Value";
 Mat cameraMatrix, distMatrix, warp3D, warp3DInv;
 //
+double cameraPara[9] = { 387.9441, 0, 307.5401,
+0, 385.1973, 269.5151,
+0, 0, 1.0000 };
+double distorPara[4] = { 0.1420, -0.2269, 0.0017, -0.0034 };
+double para[5] = { 0.4, -0.9, 0, 0, 1010.1 - 259 };
+
 void Threshold_Demo(int, void*)
 {}
 string num2str(int i){
@@ -31,14 +37,8 @@ int my_cmp(double p1, double  p2)
 }
 void updatePara(){
 
-
-	double cameraPara[9] = { 387.9441, 0, 307.5401,
-		0, 385.1973, 269.5151,
-		0, 0, 1.0000 };
-	double distorPara[4] = { 0.1420, -0.2269, 0.0017, -0.0034 };
-	double para[5] = { 0.4648, -0.8854, 0.0045, 0.0084, 698.9701-259 };
-	cameraMatrix = Mat(3, 3, CV_64FC1, cameraPara);
-	distMatrix = Mat(1, 4, CV_64FC1, distorPara);
+	Mat(3, 3, CV_64FC1, cameraPara).copyTo(cameraMatrix);
+	Mat(4, 1, CV_64FC1, distorPara).copyTo(distMatrix);//…Ó∏¥÷∆
 
 	double q0 = para[0], q1 = para[1], q2 = para[2], q3 = para[3], h = para[4];
 	double R[9] = {
@@ -53,6 +53,7 @@ void updatePara(){
 	warp3D.row(1) *= -h;
 
 	warp3DInv = warp3D.inv();
+	cout << cameraMatrix << endl << distMatrix << endl;
 	//warp3DBias = warp3D;
 	//warp3DBias.row(0) += 500;
 	//warp3DBias.row(1) -= 1000;
@@ -143,7 +144,7 @@ int main(int argc, char** argv)
 				if (k >= x1&&k <= x2 || k >= x2&&k <= x1)
 				{
 					
-					double y = (x - x2) / (x1 - x2)*(y1 - y2) + y2;
+					y = (x - x2) / (x1 - x2)*(y1 - y2) + y2;
 					getmin.push_back(y);
 				}
 				
@@ -163,7 +164,21 @@ int main(int argc, char** argv)
 			{
 				double a, b;
 				circle(frame, Point2f(x, y), 5, Scalar(255, 0, 0));
-				getPoint3D(x, y, a, b);
+				
+				Mat p_origin, p_after;
+				double aa[2] = { x, y };
+				p_origin.push_back(Mat(1, 1, CV_64FC2, aa));
+				undistortPoints(p_origin, p_after, cameraMatrix, distMatrix);
+				//cout << cameraMatrix << endl << distMatrix << endl;
+				//cout << p_origin << endl;
+				
+				double x0 = p_after.at<double>(0, 0);
+				double y0 = p_after.at<double>(0, 1);
+				double fx = 388.2391, cx = 307.5625, fy = 385.5123, cy = 269.5769;
+				x0 = x0*fx + cx;
+				y0 = y0*fy + cy;
+				//cout << x0<<" "<<y0 << endl;
+				getPoint3D(x0, y0, a, b);
 				cout << b << " ";
 			}
 
