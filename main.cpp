@@ -3,7 +3,7 @@
 #include <highgui.h>
 #include <string>
 #include <sstream>
-#include <Windows.h>
+#include <fstream>
 #include "lsd_opencv.hpp"
 using namespace std;
 using namespace cv;
@@ -66,11 +66,22 @@ void getPoint3D(double u, double v, double &x, double &y){
 	cv::Mat_<double> y_ = warp3D.row(1)*axisImage / divderD;
 	x = x_(0, 0);
 	y = y_(0, 0);
-};
+}
+void wrongPointDetect(double p[])
+{
+	
+	for (int i = 1; i < 640-1; i++)
+	{
+		if (fabs(p[i - 1] - p[i + 1])<10 && fabs(p[i] - p[i - 1])>50)
+			p[i] = (p[i + 1] + p[i - 1]) / 2;
+
+	}
+}
 int main(int argc, char** argv)
 {
 	//bar window
-	double p[640][2];
+	double p[640];
+	double depth[640];
 	cv::namedWindow("BarValueThres");
 	cv::namedWindow("video");
 	string ss("");
@@ -156,35 +167,40 @@ int main(int argc, char** argv)
 			if (getmin.size() > 1)
 			{
 				y = (getmin[0] + getmin[1]) / 2;
-				p[k][0] = x;
-				p[k][1] = y;
+				p[k]=y;
 				
 			}
-			if (k % 50 == 0)
-			{
+
+		}
+		wrongPointDetect(p);
+		
+		for (int k = 0; k < 640; k++)
+		{
+			
 				double a, b;
-				circle(frame, Point2f(x, y), 5, Scalar(255, 0, 0));
-				
+				circle(frame, Point2f(k, p[k]), 5, Scalar(255, 0, 0));
+
 				Mat p_origin, p_after;
-				double aa[2] = { x, y };
+				double aa[2] = { k, p[k] };
 				p_origin.push_back(Mat(1, 1, CV_64FC2, aa));
 				undistortPoints(p_origin, p_after, cameraMatrix, distMatrix);
 				//cout << cameraMatrix << endl << distMatrix << endl;
 				//cout << p_origin << endl;
-				
+
 				double x0 = p_after.at<double>(0, 0);
 				double y0 = p_after.at<double>(0, 1);
 				double fx = 388.2391, cx = 307.5625, fy = 385.5123, cy = 269.5769;
 				x0 = x0*fx + cx;
 				y0 = y0*fy + cy;
 				//cout << x0<<" "<<y0 << endl;
+
 				getPoint3D(x0, y0, a, b);
-				cout << b << " ";
-			}
-
-
-
+				depth[k] = b;
+				if (k % 50 == 0)
+					cout << b << " ";
+			
 		}
+		
 		cout << endl;
 		
 		//show line
@@ -192,15 +208,25 @@ int main(int argc, char** argv)
 		lsd_std->drawSegments(drawnLines, out_line);
 		imshow("Standard refinement", drawnLines);
 
-		imshow("rgb", frame);
+		//imshow("rgb", frame);
 		imshow("video", gray);
 		imshow("extract", gray1);
 		//imshow("disvideo", distortframe);
 		if (c == 32){ //c==32
-			imwrite((num2str(index) + ".jpg").c_str(), frame);
-			cout << index << endl;
-			++index;
-			//Sleep(2000);
+			/*	imwrite((num2str(index) + ".jpg").c_str(), frame);
+				cout << index << endl;
+				++index;
+				Sleep(2000);*/
+			static ofstream outfile;
+			if (!outfile.is_open()) {
+				cout << "not open" << endl;
+				outfile.open("depth.txt", ios::out);//文件名改成自己的
+			}
+			for (int i = 0; i < 639; i++)
+			{
+				outfile << depth[i] << '\t';
+			}
+			outfile << depth[639] << endl;
 		}
 
 		c = cvWaitKey(30);
