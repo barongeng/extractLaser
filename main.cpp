@@ -23,7 +23,7 @@ double cameraPara[9] = { 387.9441, 0, 307.5401,
 0, 0, 1.0000 };
 double distorPara[4] = { 0.1420, -0.2269, 0.0017, -0.0034 };
 double para[5] = { 0.4, -0.9, 0, 0, 1010.1 - 259 };
-
+double a[640], b[640], c[640];
 void Threshold_Demo(int, void*)
 {}
 string num2str(int i){
@@ -77,6 +77,97 @@ void wrongPointDetect(double p[])
 
 	}
 }
+void dataProcess(int start, int end, int step)
+{
+	bool first = true;
+	Mat A[640], B[640];
+	double depth[640];
+	int index = 1;
+	for (int s = start; s <= end; s += step)
+	{
+		static ifstream infile;
+		if (!infile.is_open()) {
+			infile.open("depth.txt", ios::in);
+		}
+		for (int i = 0; i < 640; i++)
+		{
+			double a;
+			infile >> a;
+			/*if (a<0 || a>5000)
+				a = 0;*/
+			depth[i] = a;
+			//cout << a << " ";
+		}
+
+		for (int i = 0; i < 640; i++)
+		{
+			
+			double num = depth[i];
+			double temp[3] = { num*num, num, 1 };
+			A[i ].push_back(Mat(1, 3, CV_64FC1, temp));
+			/*double temp[2] = {  num, 1 };
+			A[i].push_back(Mat(1, 2, CV_64FC1, temp));*/
+			B[i ].push_back(Mat(1, 1, CV_64FC1, s));
+		}
+	}
+	/*Mat P = A[140].t()*A[140];
+	Mat Q = A[140].t()*B[140];
+	cout << P << endl;
+	cout << Q << endl;
+	cout << P.inv()*Q << endl;*/
+	for (int i = 0; i < 640; i++)
+	{
+		Mat AA = A[i].t()* A[i];
+		Mat BB = A[i].t()* B[i];
+		Mat x = AA.inv()*BB;
+		//cout << x << endl;
+		a[i] = x.at<double>(0, 0);
+		b[i] = x.at<double>(1, 0);
+		c[i] = x.at<double>(2, 0);
+	}
+
+
+
+}
+Mat aa = Mat(1, 640, CV_64FC1, a);
+Mat bb = Mat(1, 640, CV_64FC1, b);
+Mat cc = Mat(1, 640, CV_64FC1, c);
+void yanzheng()
+{
+
+	double depth[640];
+	static ifstream infile;
+	infile.close();
+	for (int k = 0; k < 9; k++)
+	{
+		
+		if (!infile.is_open()) {
+			infile.open("depth.txt", ios::in);
+		}
+		for (int i = 0; i < 640; i++)
+		{
+			double a;
+			infile >> a;
+			if (a<0 || a>5000)
+				a = 0;
+			depth[i] = a;
+			/*if (i % 50 == 0)
+				cout << a << endl;*/
+		}
+		Mat x = Mat(1, 640, CV_64FC1, depth);
+		Mat result;
+		Mat A, B;
+		result = aa.mul(x).mul(x) + bb.mul(x)+cc;
+		/*for (int j = 0; j < 640; j += 20)
+		{
+			cout << result.at<double>(0, j) << " ";
+		}
+		cout << endl;*/
+	}
+	
+
+
+}
 int main(int argc, char** argv)
 {
 	//bar window
@@ -99,6 +190,8 @@ int main(int argc, char** argv)
 	int index = 0;
 	//显示视屏
 	char c = 0;
+	dataProcess(800, 4000, 400);
+	yanzheng();
 	updatePara();
 	while (1)
 	{
@@ -196,12 +289,22 @@ int main(int argc, char** argv)
 
 				getPoint3D(x0, y0, a, b);
 				depth[k] = b;
-				if (k % 50 == 0)
-					cout << b << " ";
+				/*if (k % 50 == 0)
+					cout << b << " ";*/
 			
 		}
-		
+
+		//利用线性优化系数进行优化
+		Mat x = Mat(1, 640, CV_64FC1, depth);
+		Mat result;
+		Mat A, B;
+		result = aa.mul(x).mul(x) + bb.mul(x) + cc;
+		for (int j = 0; j < 640; j += 20)
+		{
+			cout << result.at<double>(0, j) << " ";
+		}
 		cout << endl;
+		//cout << endl;
 		
 		//show line
 		Mat drawnLines(frame);
@@ -220,7 +323,7 @@ int main(int argc, char** argv)
 			static ofstream outfile;
 			if (!outfile.is_open()) {
 				cout << "not open" << endl;
-				outfile.open("depth.txt", ios::out);//文件名改成自己的
+				outfile.open("depth1.txt", ios::out);//文件名改成自己的
 			}
 			for (int i = 0; i < 639; i++)
 			{
