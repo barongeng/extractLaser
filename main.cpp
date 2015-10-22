@@ -87,7 +87,7 @@ void dataProcess(int start, int end, int step)
 	{
 		static ifstream infile;
 		if (!infile.is_open()) {
-			infile.open("depth.txt", ios::in);
+			infile.open("depth1.txt", ios::in);
 		}
 		for (int i = 0; i < 640; i++)
 		{
@@ -138,11 +138,11 @@ void yanzheng()
 	double depth[640];
 	static ifstream infile;
 	infile.close();
-	for (int k = 0; k < 9; k++)
+	for (int k = 0; k < 20; k++)
 	{
 		
 		if (!infile.is_open()) {
-			infile.open("depth.txt", ios::in);
+			infile.open("depth1.txt", ios::in);
 		}
 		for (int i = 0; i < 640; i++)
 		{
@@ -151,18 +151,18 @@ void yanzheng()
 			if (a<0 || a>5000)
 				a = 0;
 			depth[i] = a;
-			/*if (i % 50 == 0)
-				cout << a << endl;*/
+			if (i % 50 == 0)
+				cout << a << endl;
 		}
 		Mat x = Mat(1, 640, CV_64FC1, depth);
 		Mat result;
 		Mat A, B;
 		result = aa.mul(x).mul(x) + bb.mul(x)+cc;
-		/*for (int j = 0; j < 640; j += 20)
+		for (int j = 0; j < 640; j += 20)
 		{
 			cout << result.at<double>(0, j) << " ";
 		}
-		cout << endl;*/
+		cout << endl;
 	}
 	
 
@@ -173,12 +173,14 @@ int main(int argc, char** argv)
 	//bar window
 	double p[640];
 	double depth[640];
+	double worldx[640];
 	cv::namedWindow("BarValueThres");
 	cv::namedWindow("video");
 	string ss("");
 	cv::VideoCapture videoCapture(0);
 	videoCapture.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	videoCapture.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+	videoCapture.set(CV_CAP_PROP_EXPOSURE, -6);
 	//内参
 	/*Mat intrinsic = (Mat_<double>(3, 3) << 392.6625, 0, 593.9263,
 		0, 390.7315, 329.4303,
@@ -190,7 +192,7 @@ int main(int argc, char** argv)
 	int index = 0;
 	//显示视屏
 	char c = 0;
-	dataProcess(800, 4000, 400);
+	dataProcess(1000, 3000, 100);
 	yanzheng();
 	updatePara();
 	while (1)
@@ -260,19 +262,22 @@ int main(int argc, char** argv)
 			if (getmin.size() > 1)
 			{
 				y = (getmin[0] + getmin[1]) / 2;
-				p[k]=y;
-				
+				p[k] = y;
+
 			}
+			else
+				p[k] = 0;
 
 		}
 		wrongPointDetect(p);
+		Mat pic(1000, 1000, CV_8UC3);
 		
 		for (int k = 0; k < 640; k++)
 		{
 			
 				double a, b;
-				circle(frame, Point2f(k, p[k]), 5, Scalar(255, 0, 0));
-
+				
+				circle(frame, Point2f(k, p[k]), 3, Scalar(255, 0, 0));
 				Mat p_origin, p_after;
 				double aa[2] = { k, p[k] };
 				p_origin.push_back(Mat(1, 1, CV_64FC2, aa));
@@ -289,20 +294,35 @@ int main(int argc, char** argv)
 
 				getPoint3D(x0, y0, a, b);
 				depth[k] = b;
+				worldx[k] = a;
+				cout << a << endl << b << endl;
+				/*if (p[k] == 0)
+					continue;
+				circle(pic, Point2f(a/10+500, b/10), 3, Scalar(255, 0, 0));*/
+				
 				/*if (k % 50 == 0)
 					cout << b << " ";*/
 			
 		}
+		/*imshow("map", pic);*/
 
 		//利用线性优化系数进行优化
 		Mat x = Mat(1, 640, CV_64FC1, depth);
 		Mat result;
 		Mat A, B;
 		result = aa.mul(x).mul(x) + bb.mul(x) + cc;
-		for (int j = 0; j < 640; j += 20)
+		for (int j = 0; j < 640; j += 50)
 		{
 			cout << result.at<double>(0, j) << " ";
+			circle(frame, Point2f(j, p[j]), 5, Scalar(0, 255, 0));
 		}
+		for (int j = 0; j < 640; j++)
+		{
+			if (p[j] == 0)
+				continue;
+			circle(pic, Point2f(worldx[j] / 10 + 500, result.at<double>(0, j) / 10), 3, Scalar(255, 0, 0));
+		}
+		imshow("map", pic);
 		cout << endl;
 		//cout << endl;
 		
@@ -323,7 +343,7 @@ int main(int argc, char** argv)
 			static ofstream outfile;
 			if (!outfile.is_open()) {
 				cout << "not open" << endl;
-				outfile.open("depth1.txt", ios::out);//文件名改成自己的
+				outfile.open("depth2.txt", ios::out);//文件名改成自己的
 			}
 			for (int i = 0; i < 639; i++)
 			{
