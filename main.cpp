@@ -8,21 +8,23 @@
 using namespace std;
 using namespace cv;
 //control bar
-int threshold_value1 = 200;
+int threshold_value1 = 150;
 int threshold_value2 = 255;
-int threshold_value3 = 60;
-int threshold_value4 = 120;
+int threshold_value3 = 80;
+int threshold_value4 = 100;
+int threshold_value5 = 750;
 char* trackbar_value1 = "H_low Value";
 char* trackbar_value2 = "H_high Value";
 char* trackbar_value3 = "angle_low Value";
 char* trackbar_value4 = "angle_high Value";
+char* trackbar_value5 = "HIGH";
 Mat cameraMatrix, distMatrix, warp3D, warp3DInv;
 //
 double cameraPara[9] = { 387.9441, 0, 307.5401,
 0, 385.1973, 269.5151,
 0, 0, 1.0000 };
 double distorPara[4] = { 0.1420, -0.2269, 0.0017, -0.0034 };
-double para[5] = { 0.4, -0.9, 0, 0, 1010.1 - 259 };
+double para[5] = { 0.376445490967450 ,- 0.926358114094578	,0.0108593356748642 ,- 0.00561352029593190	,1010.59051752313-259 };
 double a[640], b[640], c[640];
 void Threshold_Demo(int, void*)
 {}
@@ -87,7 +89,7 @@ void dataProcess(int start, int end, int step)
 	{
 		static ifstream infile;
 		if (!infile.is_open()) {
-			infile.open("depth1.txt", ios::in);
+			infile.open("depth2.txt", ios::in);
 		}
 		for (int i = 0; i < 640; i++)
 		{
@@ -103,8 +105,9 @@ void dataProcess(int start, int end, int step)
 		{
 			
 			double num = depth[i];
-			double temp[3] = { num*num, num, 1 };
-			A[i ].push_back(Mat(1, 3, CV_64FC1, temp));
+			//double temp[3] = { num*num, num, 1 };
+			double temp[2] = {  num, 1 };
+			A[i ].push_back(Mat(1, 2, CV_64FC1, temp));
 			/*double temp[2] = {  num, 1 };
 			A[i].push_back(Mat(1, 2, CV_64FC1, temp));*/
 			B[i ].push_back(Mat(1, 1, CV_64FC1, s));
@@ -120,10 +123,10 @@ void dataProcess(int start, int end, int step)
 		Mat AA = A[i].t()* A[i];
 		Mat BB = A[i].t()* B[i];
 		Mat x = AA.inv()*BB;
-		//cout << x << endl;
+		cout << x << endl;
 		a[i] = x.at<double>(0, 0);
 		b[i] = x.at<double>(1, 0);
-		c[i] = x.at<double>(2, 0);
+		//c[i] = x.at<double>(2, 0);
 	}
 
 
@@ -142,7 +145,7 @@ void yanzheng()
 	{
 		
 		if (!infile.is_open()) {
-			infile.open("depth1.txt", ios::in);
+			infile.open("depth2.txt", ios::in);
 		}
 		for (int i = 0; i < 640; i++)
 		{
@@ -157,7 +160,8 @@ void yanzheng()
 		Mat x = Mat(1, 640, CV_64FC1, depth);
 		Mat result;
 		Mat A, B;
-		result = aa.mul(x).mul(x) + bb.mul(x)+cc;
+		//result = aa.mul(x).mul(x) + bb.mul(x)+cc;
+		result = aa.mul(x) + bb;
 		for (int j = 0; j < 640; j += 20)
 		{
 			cout << result.at<double>(0, j) << " ";
@@ -171,9 +175,10 @@ void yanzheng()
 int main(int argc, char** argv)
 {
 	//bar window
-	double p[640];
-	double depth[640];
-	double worldx[640];
+	//double p[640];
+	vector<double> p[640];
+	vector<double> depth[1000];
+	vector<double> worldx[1000];
 	cv::namedWindow("BarValueThres");
 	cv::namedWindow("video");
 	string ss("");
@@ -192,7 +197,7 @@ int main(int argc, char** argv)
 	int index = 0;
 	//显示视屏
 	char c = 0;
-	dataProcess(1000, 3000, 100);
+	dataProcess(800, 3000, 200);
 	yanzheng();
 	updatePara();
 	while (1)
@@ -214,6 +219,7 @@ int main(int argc, char** argv)
 		createTrackbar(trackbar_value4,
 			"BarValueThres", &threshold_value4,
 			180, Threshold_Demo);
+		updatePara();
 		//
 		if (!frame.data)
 			continue;
@@ -240,6 +246,7 @@ int main(int argc, char** argv)
 		for (int k = 0; k < 640; k++)
 		{
 			vector<double> getmin;
+			p[k].clear();
 			double x = k, y;
 			for (int i = 0; i < out_line.size(); i++)
 			{
@@ -259,27 +266,40 @@ int main(int argc, char** argv)
 				//circle(frame, Point2f(x2, y2), 3, Scalar(255, 0, 0));
 			}
 			sort(getmin.begin(), getmin.end(), my_cmp);
-			if (getmin.size() > 1)
+			if (getmin.size() >= 4)
 			{
 				y = (getmin[0] + getmin[1]) / 2;
-				p[k] = y;
-
+				p[k].push_back(y);
+				y = (getmin[2] + getmin[3]) / 2;
+				p[k].push_back(y);
+			}
+			else if (getmin.size() > 1)
+			{
+				y = (getmin[0] + getmin[1]) / 2;
+				p[k].push_back(y);
+			}
+			else if (getmin.size() == 1)
+			{
+				p[k].push_back(getmin[0]);
 			}
 			else
-				p[k] = 0;
+				p[k].push_back(0);
 
 		}
-		wrongPointDetect(p);
+		//wrongPointDetect(p);
 		Mat pic(1000, 1000, CV_8UC3);
-		
+		int count = 0;
 		for (int k = 0; k < 640; k++)
 		{
 			
+			depth[k].clear();
+			worldx[k].clear();
+			for (int i = 0; i < p[k].size(); i++)
+			{
 				double a, b;
-				
-				circle(frame, Point2f(k, p[k]), 3, Scalar(255, 0, 0));
+				circle(frame, Point2f(k, p[k][i]), 3, Scalar(255, 0, 0));
 				Mat p_origin, p_after;
-				double aa[2] = { k, p[k] };
+				double aa[2] = { k, p[k][i] };
 				p_origin.push_back(Mat(1, 1, CV_64FC2, aa));
 				undistortPoints(p_origin, p_after, cameraMatrix, distMatrix);
 				//cout << cameraMatrix << endl << distMatrix << endl;
@@ -293,9 +313,15 @@ int main(int argc, char** argv)
 				//cout << x0<<" "<<y0 << endl;
 
 				getPoint3D(x0, y0, a, b);
-				depth[k] = b;
-				worldx[k] = a;
-				cout << a << endl << b << endl;
+				depth[k].push_back(b);
+				worldx[k].push_back(a);
+				count++;
+			}
+			    
+				
+				
+				
+				//cout << a << endl << b << endl;
 				/*if (p[k] == 0)
 					continue;
 				circle(pic, Point2f(a/10+500, b/10), 3, Scalar(255, 0, 0));*/
@@ -310,28 +336,41 @@ int main(int argc, char** argv)
 		Mat x = Mat(1, 640, CV_64FC1, depth);
 		Mat result;
 		Mat A, B;
-		result = aa.mul(x).mul(x) + bb.mul(x) + cc;
+		//result = aa.mul(x).mul(x) + bb.mul(x) + cc;
+		result = aa.mul(x) + bb;
 		for (int j = 0; j < 640; j += 50)
 		{
-			cout << result.at<double>(0, j) << " ";
-			circle(frame, Point2f(j, p[j]), 5, Scalar(0, 255, 0));
+			//cout << result.at<double>(0, j) << " ";
+			for (int i = 0; i < p[j].size(); i++)
+			{
+				cout << "[" << worldx[j][i] << "," << depth[j][i] << "] ";
+				circle(frame, Point2f(j, p[j][i]), 5, Scalar(0, 255, 0));
+			}
+			
 		}
 		for (int j = 0; j < 640; j++)
 		{
-			if (p[j] == 0)
+			if (p[j][0] == 0)
 				continue;
-			circle(pic, Point2f(worldx[j] / 10 + 500, result.at<double>(0, j) / 10), 3, Scalar(255, 0, 0));
+			for (int i = 0; i < worldx[j].size(); i++)
+			{
+				//circle(pic, Point2f(worldx[j][i] / 5 +600, result.at<double>(0, j) / 5+300), 3, Scalar(255, 0, 0));
+				circle(pic, Point2f(worldx[j][i] / 5 + 600, depth[j][i] / 5 + 300), 3, Scalar(255, 0, 0));
+			}
+			
 		}
+		circle(pic, Point2f( 0 + 600, 0 + 300), 10, Scalar(0, 0, 255));
+		flip(pic, pic, 0);
 		imshow("map", pic);
 		cout << endl;
 		//cout << endl;
 		
 		//show line
 		Mat drawnLines(frame);
-		lsd_std->drawSegments(drawnLines, out_line);
-		imshow("Standard refinement", drawnLines);
+		//lsd_std->drawSegments(drawnLines, out_line);
+		//imshow("Standard refinement", drawnLines);
 
-		//imshow("rgb", frame);
+		imshow("rgb", frame);
 		imshow("video", gray);
 		imshow("extract", gray1);
 		//imshow("disvideo", distortframe);
@@ -343,13 +382,13 @@ int main(int argc, char** argv)
 			static ofstream outfile;
 			if (!outfile.is_open()) {
 				cout << "not open" << endl;
-				outfile.open("depth2.txt", ios::out);//文件名改成自己的
+				outfile.open("depth.txt", ios::out);//文件名改成自己的
 			}
 			for (int i = 0; i < 639; i++)
 			{
-				outfile << depth[i] << '\t';
+				outfile << depth[i][0] << '\t';
 			}
-			outfile << depth[639] << endl;
+			outfile << depth[639][0] << endl;
 		}
 
 		c = cvWaitKey(30);
